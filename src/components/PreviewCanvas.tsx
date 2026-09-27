@@ -35,24 +35,42 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const handleFitToView = useCallback(() => {
     if (!containerRef.current) return;
     const { clientWidth, clientHeight } = containerRef.current;
+    if (clientWidth <= 0 || clientHeight <= 0) return;
+
     const padding = 48; // px padding
     const availW = Math.max(100, clientWidth - padding * 2);
     const availH = Math.max(100, clientHeight - padding * 2);
 
-    const scaleX = availW / docData.viewBox.width;
-    const scaleY = availH / docData.viewBox.height;
+    const docW = docData.viewBox.width > 0 ? docData.viewBox.width : 512;
+    const docH = docData.viewBox.height > 0 ? docData.viewBox.height : 512;
+
+    const scaleX = availW / docW;
+    const scaleY = availH / docH;
     const fitScale = Math.min(scaleX, scaleY, 2.5); // cap at 2.5x
 
-    const centerX = (clientWidth - docData.viewBox.width * fitScale) / 2 - docData.viewBox.x * fitScale;
-    const centerY = (clientHeight - docData.viewBox.height * fitScale) / 2 - docData.viewBox.y * fitScale;
+    const centerX = (clientWidth - docW * fitScale) / 2;
+    const centerY = (clientHeight - docH * fitScale) / 2;
 
     setZoom(fitScale);
     setPan({ x: centerX, y: centerY });
   }, [docData.viewBox]);
 
-  // Initial fit on document change
+  // Initial fit on document change & resize observation
   useEffect(() => {
+    if (!containerRef.current) return;
+
     handleFitToView();
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+          handleFitToView();
+        }
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
   }, [docData, handleFitToView]);
 
   // Mouse wheel zoom
@@ -108,7 +126,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      className={`relative w-full h-full overflow-hidden select-none bg-[#090d16] flex items-center justify-center ${
+      className={`relative w-full h-full overflow-hidden select-none bg-[#090d16] ${
         isDragging ? 'cursor-grabbing' : 'cursor-grab'
       }`}
     >
@@ -139,10 +157,16 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
         </button>
         <button
           onClick={() => {
+            if (!containerRef.current) return;
+            const { clientWidth, clientHeight } = containerRef.current;
+            const docW = docData.viewBox.width > 0 ? docData.viewBox.width : 512;
+            const docH = docData.viewBox.height > 0 ? docData.viewBox.height : 512;
+            const centerX = (clientWidth - docW) / 2;
+            const centerY = (clientHeight - docH) / 2;
             setZoom(1);
-            setPan({ x: 0, y: 0 });
+            setPan({ x: centerX, y: centerY });
           }}
-          title="Reset to 100%"
+          title="Reset to 100% (Center)"
           className="flex items-center gap-1 px-2 py-1 text-xs font-mono text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -180,15 +204,13 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           transformOrigin: '0 0',
           transition: isDragging ? 'none' : 'transform 0.05s ease-out',
         }}
-        className="relative"
+        className="absolute top-0 left-0"
       >
         {/* Document Boundary & Checkerboard Backdrop */}
         <div
           style={{
             width: docData.viewBox.width,
             height: docData.viewBox.height,
-            marginLeft: docData.viewBox.x,
-            marginTop: docData.viewBox.y,
           }}
           className={`relative shadow-2xl transition-all border border-slate-700/80 ${
             showGrid
@@ -319,7 +341,14 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
             {/* Selection Bounding Box & Handles Overlay */}
             {selectedLayer && selectedLayer.isVisible && (
-              <g pointerEvents="none">
+              <g
+                pointerEvents="none"
+                transform={
+                  bakeTransforms
+                    ? undefined
+                    : `matrix(${selectedLayer.accumulatedMatrix[0]} ${selectedLayer.accumulatedMatrix[1]} ${selectedLayer.accumulatedMatrix[2]} ${selectedLayer.accumulatedMatrix[3]} ${selectedLayer.accumulatedMatrix[4]} ${selectedLayer.accumulatedMatrix[5]})`
+                }
+              >
                 <rect
                   x={selectedLayer.bounds.x - 2}
                   y={selectedLayer.bounds.y - 2}
@@ -356,6 +385,19 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           </svg>
         </div>
       </div>
+
+      {/* Empty State Overlay */}
+      {layers.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center p-6 text-center pointer-events-none">
+          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-xl max-w-sm pointer-events-auto shadow-2xl">
+            <Layers className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-200">Tidak Ada Layer Terlihat</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Gunakan menu "Import SVG" untuk memilih preset atau upload file SVG.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Floating Info bar */}
       <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 p-1.5 px-3 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg text-[11px] font-mono text-slate-400 shadow-lg">

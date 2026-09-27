@@ -398,11 +398,31 @@ export function parseGradientElement(
     offset = clamp(offset, 0, 1);
 
     // Stop color and opacity
-    const stopColorAttr = stopElem.getAttribute('stop-color') || stopElem.style.stopColor || '#000000';
-    const stopOpacityAttr = stopElem.getAttribute('stop-opacity') || stopElem.style.stopOpacity || '1';
-    const stopOpacity = clamp(parseFloat(stopOpacityAttr) || 1, 0, 1);
+    let stopColorAttr: string | null | undefined = stopElem.getAttribute('stop-color');
+    let stopOpacityAttr: string | null | undefined = stopElem.getAttribute('stop-opacity');
 
-    const parsedColor = parseCssColor(stopColorAttr) || { hex: '#000000', r: 0, g: 0, b: 0, a: 1, type: 'solid' };
+    // Parse inline style if present (e.g. style="stop-color:#ffffff;stop-opacity:1")
+    const stopStyle = stopElem.getAttribute('style') || '';
+    if (stopStyle) {
+      const colMatch = stopStyle.match(/stop-color\s*:\s*([^;]+)/i);
+      if (colMatch && !stopColorAttr) {
+        stopColorAttr = colMatch[1].trim();
+      }
+      const opMatch = stopStyle.match(/stop-opacity\s*:\s*([^;]+)/i);
+      if (opMatch && !stopOpacityAttr) {
+        stopOpacityAttr = opMatch[1].trim();
+      }
+    }
+
+    if (!stopColorAttr && 'style' in stopElem && (stopElem as unknown as { style?: Record<string, string> }).style?.stopColor) {
+      stopColorAttr = (stopElem as unknown as { style?: Record<string, string> }).style?.stopColor;
+    }
+    if (!stopOpacityAttr && 'style' in stopElem && (stopElem as unknown as { style?: Record<string, string> }).style?.stopOpacity) {
+      stopOpacityAttr = (stopElem as unknown as { style?: Record<string, string> }).style?.stopOpacity;
+    }
+
+    const stopOpacity = clamp(parseFloat(stopOpacityAttr || '1') || 1, 0, 1);
+    const parsedColor = parseCssColor(stopColorAttr || '#000000') || { hex: '#000000', r: 0, g: 0, b: 0, a: 1, type: 'solid' };
 
     stops.push({
       offset,

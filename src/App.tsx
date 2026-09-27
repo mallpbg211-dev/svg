@@ -24,12 +24,25 @@ const DEFAULT_SETTINGS: OptimizerSettings = {
 export default function App() {
   // Parse initial document from first sample
   const [docData, setDocData] = useState<SVGDocumentData>(() => {
-    return parseSvgDocument(SAMPLE_SVGS[0].svg, true);
+    try {
+      return parseSvgDocument(SAMPLE_SVGS[0].svg, true);
+    } catch (err) {
+      console.error('Initial SVG parse fallback triggered:', err);
+      return {
+        title: SAMPLE_SVGS[0].name,
+        viewBox: { x: 0, y: 0, width: 512, height: 512 },
+        width: 512,
+        height: 512,
+        layers: [],
+        gradients: {},
+        rawSvgString: SAMPLE_SVGS[0].svg,
+      };
+    }
   });
 
   const [layers, setLayers] = useState<ParsedShapeLayer[]>(() => docData.layers);
   const [settings, setSettings] = useState<OptimizerSettings>(DEFAULT_SETTINGS);
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(() => docData.layers[0]?.id || null);
 
   // Modals & Views
   const [isExportOpen, setIsExportOpen] = useState(false);
