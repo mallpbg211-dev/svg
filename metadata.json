@@ -1,0 +1,6 @@
+{
+  "name": "SVG to Alight Motion XML Converter",
+  "description": "Convert, parse, and optimize SVG vector assets to Alight Motion XML format with nested transform accumulation, path merge, partial raster flattening, and interactive layer management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
